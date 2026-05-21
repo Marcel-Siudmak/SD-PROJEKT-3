@@ -35,6 +35,6 @@ SłownikTablicaMieszajaca/
 │   ├── HashTableAVL.hpp            # Tablica mieszająca + AVL (nagłówek)
 │   ├── HashTableAVL.cpp            # Tablica mieszająca + AVL (implementacja)
 │   │
-│   └── main.cpp                    # Generowanie danych, pomiary chrono, menu
+│   └── main.cpp                    # 
 │
 └── CMakeLists.txt                  # Plik konfiguracyjny do budowania projektu
