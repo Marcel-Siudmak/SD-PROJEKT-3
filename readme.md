@@ -5,7 +5,7 @@ Projekt realizowany w ramach przedmiotu Struktury Danych.
 ---
 
 1. **HashTableList** – Kubełki oparte na liście wiązanej.
-2. **HashTableBST** – Kubełki oparte na zwykłym drzewe przeszukiwań binarnych (BST).
+2. **CuckooHashTable** – Cuckoo hashing
 3. **HashTableAVL** – Kubełki oparte na zbalansowanym drzewie AVL.
 
 **Badane operacje:** `insert()` oraz `remove()`.
@@ -23,17 +23,14 @@ SłownikTablicaMieszajaca/
 │   ├── LinkedList.hpp              # Klasa listy wiązanej (nagłówek)
 │   ├── LinkedList.cpp              # Klasa listy wiązanej (implementacja)
 │   │
-│   ├── BSTree.hpp                  # Klasa zwykłego drzewa BST (nagłówek)
-│   ├── BSTree.cpp                  # Klasa zwykłego drzewa BST (implementacja)
-│   │
 │   ├── AVLTree.hpp                 # Klasa zbalansowanego drzewa AVL (nagłówek)
 │   ├── AVLTree.cpp                 # Klasa zbalansowanego drzewa AVL (implementacja)
 │   │
 │   ├── HashTableList.hpp           # Tablica mieszająca + lista (nagłówek)
 │   ├── HashTableList.cpp           # Tablica mieszająca + lista (implementacja)
 │   │
-│   ├── HashTableBST.hpp            # Tablica mieszająca + BST (nagłówek)
-│   ├── HashTableBST.cpp            # Tablica mieszająca + BST (implementacja)
+│   ├── CuckooHashTable.hpp         # Tablica mieszająca typu Cuckoo (nagłówek)
+│   ├── CuckooHashTable.cpp         # Tablica mieszająca typu Cuckoo (implementacja)
 │   │
 │   ├── HashTableAVL.hpp            # Tablica mieszająca + AVL (nagłówek)
 │   ├── HashTableAVL.cpp            # Tablica mieszająca + AVL (implementacja)

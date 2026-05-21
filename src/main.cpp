@@ -1,45 +1,35 @@
-#include "benchmark.hpp"
-#include "data_handler.hpp"
-#include "doubly_linked_list.hpp"
-#include "singly_linked_list.hpp"
-#include "array_list.hpp"
-#include "menu.hpp"
 #include <iostream>
+#include "HashTableList.hpp"
 
 int main() {
-  std::cout << "Starting SD-PROJEKT-1 Benchmarks...\n\n";
-  menu main_menu;
-    main_menu.run();
-//   std::string dataset_name = "benchmark_test_dataset";
-//   std::vector<int> measurement_points = {1000, 5000};
-//   int num_test_files = 100;
-//   unsigned int main_seed = 42;
+    std::cout << "=== SD-PROJEKT-3: Slownik oparty na Tablicy Mieszajacej ===\n\n";
 
-//   std::cout << "[1] Generating/Rebuilding dataset '" << dataset_name
-//             << "' with " << num_test_files << " files...\n";
-//   data_handler::delete_dataset(dataset_name);
-//   data_handler::generate_dataset(dataset_name, measurement_points,
-//                                  num_test_files, main_seed);
+    // Prosta demonstracja działania HashTableList
+    HashTableList ht;
 
-//   std::cout << "\n[2] Initializing benchmark suite for '" << dataset_name
-//             << "'...\n";
-//   benchmark bench(dataset_name);
+    ht.insert(1,  100);
+    ht.insert(17, 200); // 17 % 16 == 1 → kolizja z kluczem 1
+    ht.insert(5,  50);
+    ht.insert(-3, 30);  // klucz ujemny
 
-//   std::cout << "\n[3] Running Tests for SinglyLinkedList...\n";
-//   bench.run_structure_tests<singly_linked_list<int>>(
-//       "singly_linked_list", []() { return new singly_linked_list<int>(); });
+    std::cout << "Po insert(1,100), insert(17,200), insert(5,50), insert(-3,30):\n";
+    ht.display();
 
-//   std::cout << "\n[3] Running Tests for DoublyLinkedList...\n";
-//   bench.run_structure_tests<doubly_linked_list<int>>(
-//       "doubly_linked_list", []() { return new doubly_linked_list<int>(); });
+    std::cout << "\nget(1)  = " << ht.get(1)  << "\n";
+    std::cout << "get(17) = " << ht.get(17) << "\n";
+    std::cout << "get(-3) = " << ht.get(-3) << "\n";
 
+    ht.insert(1, 999); // aktualizacja wartości
+    std::cout << "\nPo insert(1, 999) [aktualizacja]:\n";
+    std::cout << "get(1) = " << ht.get(1) << "\n";
 
-//   std::cout<< "\n[3] Running Tests for ArrayList...\n";
-//   bench.run_structure_tests<array_list<int>>(
-//         "array_list", []() { return new array_list<int>(); });
-//   std::cout
-//       << "\n[4] Benchmarks finished successfully. Results saved to results/"
-//       << dataset_name << "/\n";
+    ht.remove(17);
+    std::cout << "\nPo remove(17):\n";
+    ht.display();
 
-  return 0;
+    std::cout << "\nLiczba elementow: " << ht.size() << "\n";
+    std::cout << "contains(5): "  << (ht.contains(5)  ? "tak" : "nie") << "\n";
+    std::cout << "contains(17): " << (ht.contains(17) ? "tak" : "nie") << "\n";
+
+    return 0;
 }

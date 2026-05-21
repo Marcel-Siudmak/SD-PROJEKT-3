@@ -134,4 +134,6 @@ template <typename T> void singly_linked_list<T>::clear() {
 
 template <typename T> int singly_linked_list<T>::get_size() { return size; }
 
+#include "HashTableList.hpp" // dla definicji KeyValue
 template class singly_linked_list<int>;
+template class singly_linked_list<KeyValue>;
