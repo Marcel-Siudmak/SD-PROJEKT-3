@@ -1,199 +1,137 @@
 #pragma once
+#include "CuckooHashTable.hpp"
+#include "HashTableList.hpp"
 #include "benchmark.hpp"
 #include "data_handler.hpp"
-#include "doubly_linked_list.hpp"
-#include "singly_linked_list.hpp"
-#include "array_list.hpp"
 #include <iostream>
+#include <string>
+#include <vector>
 
-class menu{
+// ─── menu
+// ─────────────────────────────────────────────────────────────────────
+//
+// Interaktywne menu do testowania słowników opartych na tablicach mieszających.
+// Obsługuje:
+//   • Generowanie / usuwanie datasetów
+//   • Konfigurację parametrów benchmarku
+//   • Uruchamianie benchmarków dla obu struktur
+//
+class menu {
 private:
-    IList<int>* _type;
-    std::string _dataset_name, _list_type;
-    std::vector<int> _points;
-    int _num_files;
-    unsigned int _main_seed;
-public:
-    menu() : _type(nullptr), _dataset_name("benchmark_test_dataset"), _list_type("singly_linked_list"), _points({1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000, 512000}), _num_files(100), _main_seed(42) {};
-    void display_menu(){
-        std::cout << "1. Choose List Type:\n";
-        std::cout << "2. Choose dataset.\n";
-        std::cout << "3. Generate/Rebuild Dataset.\n";
-        std::cout << "4. Choose Benchmark parameters.\n";
-        std::cout << "5. Run Benchmarks\n";
-        std::cout << "6. Manual Mode\n";
-        std::cout << "7. Exit\n";
-    }
-    void choose_list_type(){
-        int choice;
-        std::cout << "Choose List Type:\n";
-        std::cout << "1. Singly Linked List\n";
-        std::cout << "2. Doubly Linked List\n";
-        std::cout << "3. Array List\n";
-        std::cin >> choice;
-        switch (choice) {
-            case 1:
-                _type = new singly_linked_list<int>();
-                _list_type = "singly_linked_list";
-                break;
-            case 2:
-                _type = new doubly_linked_list<int>();
-                _list_type = "doubly_linked_list";
-                break;
-            case 3:
-                _type = new array_list<int>();
-                _list_type = "array_list";
-                break;
-            default:
-                std::cout << "Invalid choice. Defaulting to Singly Linked List.\n";
-                _type = new singly_linked_list<int>();
-                _list_type = "singly_linked_list";
-        }
-    }
-    void generate_dataset(){
-        std::cout << "Generating/Rebuilding dataset '" << _dataset_name
-            << "' with " << _num_files << " files...\n";
-        data_handler::delete_dataset(_dataset_name);
-        data_handler::generate_dataset(_dataset_name, _points, _num_files, _main_seed);
-    }
-    void run_benchmarks(){
-        std::cout << "\nInitializing benchmark suite for '" << _dataset_name
-            << "'...\n";
-        benchmark bench(_dataset_name);
-        std::cout << "\nRunning Tests for " << _dataset_name <<" "<< _list_type <<"...\n";
-        if(_list_type == "singly_linked_list"){
-            bench.run_structure_tests<singly_linked_list<int>>(
-                "singly_linked_list", []() { return new singly_linked_list<int>(); });
-        } else if(_list_type == "doubly_linked_list"){
-            bench.run_structure_tests<doubly_linked_list<int>>(
-                "doubly_linked_list", []() { return new doubly_linked_list<int>(); });
-        } else if(_list_type == "array_list"){
-            bench.run_structure_tests<array_list<int>>(
-                "array_list", []() { return new array_list<int>(); });
-        }
-        std::cout<< "\nBenchmarks finished successfully. Results saved to results/"<< _dataset_name << "/\n";
-    }
-    void parameters(){
-        std::cout << "Enter number of test files: ";
-        std::cin >> _num_files;
-        std::cout << "Enter main seed: ";
-        std::cin >> _main_seed;
-        std::cout << "Enter measurement points (comma separated): ";
-        std::string points_input;
-        std::cin >> points_input;
-        _points.clear();
-        size_t pos = 0;
-        while ((pos = points_input.find(',')) != std::string::npos) {
-            _points.push_back(std::stoi(points_input.substr(0, pos)));
-            points_input.erase(0, pos + 1);
-        }
-        if (!points_input.empty()) {
-            _points.push_back(std::stoi(points_input));
-        }
-    }
-    void manual_mode(){
-        int choice;
-        while(true){
-            std::cout << "Manual Mode:\n";
-            std::cout << "1. Push Front\n";
-            std::cout << "2. Push Back\n";
-            std::cout << "3. Pop Front\n";
-            std::cout << "4. Pop Back\n";
-            std::cout << "5. Insert at Index\n";
-            std::cout << "6. Remove at Index\n";
-            std::cout << "7. Find Value\n";
-            std::cout << "8. Display List\n";
-            std::cout << "9. Check Size\n";
-            std::cout << "10. Clear List\n";
-            std::cout << "0. Exit Manual Mode\n";
-            std::cin >> choice;
-            if(choice == 0) break;
-            int value, index;
-            switch (choice) {
-                case 1:
-                    std::cout << "Enter value to push front: ";
-                    std::cin >> value;
-                    _type->push_front(value);
-                    break;
-                case 2:
-                    std::cout << "Enter value to push back: ";
-                    std::cin >> value;
-                    _type->push_back(value);
-                    break;
-                case 3:
-                    _type->pop_front();
-                    break;
-                case 4:
-                    _type->pop_back();
-                    break;
-                case 5:
-                    std::cout << "Enter value and index to insert: ";
-                    std::cin >> value >> index;
-                    _type->insert(value, index);
-                    break;
-                case 6:
-                    std::cout << "Enter index to remove: ";
-                    std::cin >> index;
-                    _type->remove(index);
-                    break;
-                case 7:
-                    std::cout << "Enter value to find: ";
-                    std::cin >> value;
-                    if(_type->find(value)){
-                        std::cout << "Value found in list.\n";
-                    } else {
-                        std::cout << "Value not found in list.\n";
-                    }
-                    break;
-                case 8:
-                    _type->display();
-                    break;
-                case 9:
-                    std::cout << "List size: " << _type->get_size() << "\n";
-                    break;
-                case 10:
-                    _type->clear();
-                    std::cout << "List cleared.\n";
-                    break;
+  std::string _dataset_name;
+  std::vector<int> _points;
+  int _num_files;
+  unsigned int _main_seed;
 
-                default:
-                    std::cout << "Invalid choice.\n";
-            }
-        }
+public:
+  menu()
+      : _dataset_name("dict_benchmark"),
+        _points({1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000,
+                 512000}),
+        _num_files(50), _main_seed(42) {}
+
+  void display_menu() {
+    std::cout << "\n=== SD-PROJEKT-3: Benchmarking Slownnikow ===\n";
+    std::cout << "Aktualny dataset: " << _dataset_name << "\n";
+    std::cout << "1. Generuj / odbuduj dataset\n";
+    std::cout << "2. Zmien nazwe datasetu\n";
+    std::cout << "3. Parametry benchmarku\n";
+    std::cout << "4. Uruchom benchmark (oba slowniki)\n";
+    std::cout << "5. Uruchom benchmark (tylko HashTableList)\n";
+    std::cout << "6. Uruchom benchmark (tylko CuckooHashTable)\n";
+    std::cout << "7. Wyjdz\n";
+    std::cout << "Wybor: ";
+  }
+
+  void generate_dataset() {
+    std::cout << "Generowanie datasetu '" << _dataset_name << "' ("
+              << _num_files << " plikow, seed=" << _main_seed << ")...\n";
+    data_handler::delete_dataset(_dataset_name);
+    data_handler::generate_dataset(_dataset_name, _points, _num_files,
+                                   _main_seed);
+    std::cout << "Gotowe.\n";
+  }
+
+  void change_dataset() {
+    std::cout << "Podaj nowa nazwe datasetu: ";
+    std::cin >> _dataset_name;
+  }
+
+  void parameters() {
+    std::cout << "Liczba plikow testowych [" << _num_files << "]: ";
+    std::cin >> _num_files;
+
+    std::cout << "Seed glowny [" << _main_seed << "]: ";
+    std::cin >> _main_seed;
+
+    std::cout
+        << "Punkty pomiarowe (oddzielone przecinkiem, np. 1000,2000,4000): ";
+    std::string input;
+    std::cin >> input;
+
+    _points.clear();
+    size_t pos = 0;
+    while ((pos = input.find(',')) != std::string::npos) {
+      _points.push_back(std::stoi(input.substr(0, pos)));
+      input.erase(0, pos + 1);
     }
-    void run(){
-        std::cout << "Welcome to the List Benchmarking Tool!\n";
-        while(true){
-            display_menu();
-            int choice;
-            std::cin >> choice;
-            switch (choice) {
-                case 1:
-                    choose_list_type();
-                    break;
-                case 2:
-                    std::cout << "Current dataset: " << _dataset_name << "\n";
-                    std::cout << "Enter new dataset name: ";
-                    std::cin >> _dataset_name;
-                    break;
-                case 3:
-                    generate_dataset();
-                    break;
-                case 4:
-                    parameters();
-                    break;
-                case 5:
-                    run_benchmarks();
-                    break;
-                case 6:
-                    manual_mode();
-                    break;
-                case 7:
-                    std::cout << "Exiting...\n";
-                    return;
-                default:
-                    std::cout << "Invalid choice. Please try again.\n";
-            }
-        }
+    if (!input.empty())
+      _points.push_back(std::stoi(input));
+
+    std::cout << "Zapisano " << _points.size() << " punktow.\n";
+  }
+
+  void run_benchmarks_all() {
+    run_hash_table_list();
+    run_cuckoo();
+  }
+
+  void run_hash_table_list() {
+    std::cout << "\nUruchamianie benchmarku: HashTableList...\n";
+    benchmark bench(_dataset_name);
+    bench.run_structure_tests<HashTableList>(
+        "HashTableList", []() { return new HashTableList(); });
+  }
+
+  void run_cuckoo() {
+    std::cout << "\nUruchamianie benchmarku: CuckooHashTable...\n";
+    benchmark bench(_dataset_name);
+    bench.run_structure_tests<CuckooHashTable>(
+        "CuckooHashTable", []() { return new CuckooHashTable(); });
+  }
+
+  void run() {
+    std::cout << "Witaj w narzedziu do benchmarkowania slownikow!\n";
+    while (true) {
+      display_menu();
+      int choice;
+      std::cin >> choice;
+
+      switch (choice) {
+      case 1:
+        generate_dataset();
+        break;
+      case 2:
+        change_dataset();
+        break;
+      case 3:
+        parameters();
+        break;
+      case 4:
+        run_benchmarks_all();
+        break;
+      case 5:
+        run_hash_table_list();
+        break;
+      case 6:
+        run_cuckoo();
+        break;
+      case 7:
+        std::cout << "Koniec.\n";
+        return;
+      default:
+        std::cout << "Nieprawidlowy wybor.\n";
+      }
     }
+  }
 };

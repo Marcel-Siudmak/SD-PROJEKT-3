@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <random>
+#include <sstream>
 
 #ifndef PROJECT_ROOT_DIR
 #define PROJECT_ROOT_DIR "."
@@ -12,6 +13,8 @@
 namespace fs = std::filesystem;
 
 inline fs::path get_data_dir() { return fs::path(PROJECT_ROOT_DIR) / "data"; }
+
+// ─── data_set ─────────────────────────────────────────────────────────────────
 
 data_set::data_set(const std::string &dataset_name) : name_(dataset_name) {
   fs::path dataset_dir = get_data_dir() / dataset_name;
@@ -50,24 +53,34 @@ std::vector<std::string> data_set::get_test_files() const {
   return test_files_;
 }
 
-std::vector<int> data_set::get_data(const std::string &test_file,
-                                    int num_elements) const {
-  std::vector<int> data;
-  data.reserve(num_elements);
+unsigned int data_set::get_file_seed(const std::string &test_file) const {
+  fs::path p(test_file);
+  return static_cast<unsigned int>(std::stoul(p.stem().string()));
+}
 
+// Wczytuje pierwsze num_elements par (klucz, wartość) do słownika.
+void data_set::load_to_dict(const std::string &test_file, int num_elements,
+                            IDictionary &dict) const {
   fs::path file_path = get_data_dir() / name_ / test_file;
   std::ifstream file(file_path);
 
   if (!file) {
     std::cerr << "Failed to open " << file_path << "\n";
-    return data;
+    return;
   }
 
-  int val;
+  dict.clear();
+
+  std::string line;
   int count = 0;
-  while (count < num_elements && file >> val) {
-    data.push_back(val);
-    count++;
+  while (count < num_elements && std::getline(file, line)) {
+    std::istringstream ss(line);
+    int key, val;
+    char comma;
+    if (ss >> key >> comma >> val) {
+      dict.insert(key, val);
+      ++count;
+    }
   }
 
   if (count < num_elements) {
@@ -75,15 +88,33 @@ std::vector<int> data_set::get_data(const std::string &test_file,
               << " does not contain enough data (requested " << num_elements
               << ", found " << count << ").\n";
   }
-
-  return data;
 }
 
-unsigned int data_set::get_file_seed(const std::string &test_file) const {
-  // Nazwa pliku to "<seed>.txt", np. "3748291234.txt"
-  fs::path p(test_file);
-  return static_cast<unsigned int>(std::stoul(p.stem().string()));
+// Wczytuje pierwsze num_elements par jako wektor par (key, value).
+std::vector<std::pair<int,int>> data_set::load_pairs(
+    const std::string &test_file, int num_elements) const {
+  std::vector<std::pair<int,int>> pairs;
+  pairs.reserve(num_elements);
+
+  fs::path file_path = get_data_dir() / name_ / test_file;
+  std::ifstream file(file_path);
+  if (!file) return pairs;
+
+  std::string line;
+  int count = 0;
+  while (count < num_elements && std::getline(file, line)) {
+    std::istringstream ss(line);
+    int key, val;
+    char comma;
+    if (ss >> key >> comma >> val) {
+      pairs.emplace_back(key, val);
+      ++count;
+    }
+  }
+  return pairs;
 }
+
+// ─── data_handler ─────────────────────────────────────────────────────────────
 
 void data_handler::generate_dataset(const std::string &dataset_name,
                                     const std::vector<int> &points,
@@ -95,13 +126,14 @@ void data_handler::generate_dataset(const std::string &dataset_name,
 
   int max_points = *std::max_element(points.begin(), points.end());
 
-  fs::path base_dir = get_data_dir();
+  fs::path base_dir    = get_data_dir();
   fs::path dataset_dir = base_dir / dataset_name;
 
   if (!fs::exists(dataset_dir)) {
     fs::create_directories(dataset_dir);
   }
 
+  // Zapisz punkty pomiarowe
   fs::path points_path = dataset_dir / "points.txt";
   std::ofstream points_file(points_path);
   if (!points_file) {
@@ -113,13 +145,13 @@ void data_handler::generate_dataset(const std::string &dataset_name,
   }
   points_file.close();
 
+  // Generuj pliki danych: każdy wiersz to "klucz,wartość"
   std::mt19937 main_rng(main_seed);
   std::uniform_int_distribution<unsigned int> seed_dist;
 
   for (int i = 0; i < num_files; ++i) {
     unsigned int file_seed = seed_dist(main_rng);
-    fs::path data_file_path =
-        dataset_dir / (std::to_string(file_seed) + ".txt");
+    fs::path data_file_path = dataset_dir / (std::to_string(file_seed) + ".txt");
 
     std::ofstream data_file(data_file_path);
     if (!data_file) {
@@ -128,20 +160,20 @@ void data_handler::generate_dataset(const std::string &dataset_name,
     }
 
     std::mt19937 file_rng(file_seed);
-    // Zakres [1, 999'999] — wartość 1'000'000 jest zarezerwowana jako unikalna
-    // wartość szukana przez operację find w benchmarku.
-    std::uniform_int_distribution<int> num_dist(1, 999'999);
+    // Klucze ∈ [1, 2'000'000] – szeroki zakres, żeby ograniczyć kolizje
+    // Wartości ∈ [1, 999'999]
+    std::uniform_int_distribution<int> key_dist(1, 2'000'000);
+    std::uniform_int_distribution<int> val_dist(1,   999'999);
 
     for (int j = 0; j < max_points; ++j) {
-      data_file << num_dist(file_rng) << "\n";
+      data_file << key_dist(file_rng) << ',' << val_dist(file_rng) << "\n";
     }
     data_file.close();
   }
 }
 
 void data_handler::delete_dataset(const std::string &dataset_name) {
-  fs::path base_dir = get_data_dir();
-  fs::path dataset_dir = base_dir / dataset_name;
+  fs::path dataset_dir = get_data_dir() / dataset_name;
   if (fs::exists(dataset_dir)) {
     fs::remove_all(dataset_dir);
   }
@@ -151,15 +183,12 @@ std::vector<std::string> data_handler::list_datasets() {
   std::vector<std::string> datasets;
   fs::path base_dir = get_data_dir();
 
-  if (!fs::exists(base_dir)) {
-    return datasets;
-  }
+  if (!fs::exists(base_dir)) return datasets;
 
   for (const auto &entry : fs::directory_iterator(base_dir)) {
     if (entry.is_directory()) {
       datasets.push_back(entry.path().filename().string());
     }
   }
-
   return datasets;
 }

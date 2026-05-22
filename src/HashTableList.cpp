@@ -65,6 +65,16 @@ void HashTableList::remove(int key) {
     // Klucz nie istnieje – cicha operacja (zgodnie z kontraktem)
 }
 
+// ─── clear() ─────────────────────────────────────────────────────────────────────────────
+
+void HashTableList::clear() {
+    for (int i = 0; i < capacity; i++) {
+        // Usunięcie wszystkich elementów z kubekła przez kolejne pop_front
+        while (buckets[i]->get_size() > 0)
+            buckets[i]->pop_front();
+    }
+}
+
 // ─── get() ────────────────────────────────────────────────────────────────────
 
 int HashTableList::get(int key) const {

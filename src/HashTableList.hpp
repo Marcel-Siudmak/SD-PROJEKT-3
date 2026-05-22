@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include "singly_linked_list.hpp"
+#include "data_handler.hpp"  // IDictionary
 
 // Para klucz-wartość przechowywana w kubełkach
 struct KeyValue {
@@ -18,7 +19,7 @@ struct KeyValue {
 
 // Tablica mieszająca z kubełkami opartymi na liście wiązanej.
 // Rozwiązuje kolizje metodą łańcuchową (separate chaining).
-class HashTableList {
+class HashTableList : public IDictionary {
 private:
     static const int DEFAULT_CAPACITY = 16;
 
@@ -30,13 +31,13 @@ private:
 
 public:
     explicit HashTableList(int capacity = DEFAULT_CAPACITY);
-    ~HashTableList();
+    ~HashTableList() override;
 
     // Wstawia parę (key, value). Jeśli klucz już istnieje – aktualizuje wartość.
-    void insert(int key, int value);
+    void insert(int key, int value) override;
 
     // Usuwa parę o podanym kluczu. Nic nie robi, jeśli klucz nie istnieje.
-    void remove(int key);
+    void remove(int key) override;
 
     // Zwraca wartość dla klucza. Rzuca std::out_of_range jeśli klucza nie ma.
     int get(int key) const;
@@ -44,7 +45,10 @@ public:
     // Sprawdza czy klucz istnieje w słowniku
     bool contains(int key) const;
 
-    // Wypisuje zawartość tablicy (do debugowania / menu)
+    // Resetuje słownik (usuwa wszystkie pary) – wymagane przez IDictionary
+    void clear() override;
+
+    // Wypisuje zawartość tablicy (do debugowania)
     void display() const;
 
     // Zwraca liczbę przechowywanych par

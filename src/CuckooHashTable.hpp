@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include "data_handler.hpp"  // IDictionary
 
 // ─── CuckooHashTable ──────────────────────────────────────────────────────────
 //
@@ -15,7 +16,7 @@
 // Brak zewnętrznych zależności poza <iostream> i <stdexcept>.
 // ─────────────────────────────────────────────────────────────────────────────
 
-class CuckooHashTable {
+class CuckooHashTable : public IDictionary {
 public:
     // Domyślny rozmiar jednej tablicy (łączna pojemność = 2 * capacity)
     static const int DEFAULT_CAPACITY = 16;
@@ -27,7 +28,7 @@ public:
     static constexpr double MAX_LOAD = 0.49;
 
     explicit CuckooHashTable(int capacity = DEFAULT_CAPACITY);
-    ~CuckooHashTable();
+    ~CuckooHashTable() override;
 
     // Kopiowanie wyłączone (tablice dynamiczne – upraszcza kod)
     CuckooHashTable(const CuckooHashTable&)            = delete;
@@ -35,10 +36,13 @@ public:
 
     // Wstawia parę (key, value).
     // Jeśli klucz już istnieje – aktualizuje wartość (bez duplikatów).
-    void insert(int key, int value);
+    void insert(int key, int value) override;
 
     // Usuwa parę o podanym kluczu. Nic nie robi gdy klucz nie istnieje.
-    void remove(int key);
+    void remove(int key) override;
+
+    // Resetuje słownik (usuwa wszystkie pary) – wymagane przez IDictionary.
+    void clear() override;
 
     // Zwraca wartość dla klucza. Rzuca std::out_of_range gdy brak klucza.
     int get(int key) const;

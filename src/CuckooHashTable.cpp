@@ -151,6 +151,16 @@ void CuckooHashTable::remove(int key) {
     // Klucz nie istnieje – cicha operacja
 }
 
+// ─── clear() ─────────────────────────────────────────────────────────────────
+
+void CuckooHashTable::clear() {
+    for (int i = 0; i < capacity_; ++i) {
+        table1_[i].occupied = false;
+        table2_[i].occupied = false;
+    }
+    count_ = 0;
+}
+
 // ─── get() ────────────────────────────────────────────────────────────────────
 
 int CuckooHashTable::get(int key) const {
