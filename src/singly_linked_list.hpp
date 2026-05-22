@@ -38,4 +38,7 @@ public:
   void display() override;
   void clear() override;
   int get_size() override;
+
+  // Dostęp do wewnętrznej struktury (dla struktur danych wyższego poziomu)
+  singly_node<T>* get_head() const { return head; }
 };
