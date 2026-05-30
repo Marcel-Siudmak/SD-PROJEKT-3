@@ -1,4 +1,5 @@
 #pragma once
+#include "HashTableAVL.hpp"
 #include "CuckooHashTable.hpp"
 #include "HashTableList.hpp"
 #include "benchmark.hpp"
@@ -39,7 +40,8 @@ public:
     std::cout << "4. Uruchom benchmark (oba slowniki)\n";
     std::cout << "5. Uruchom benchmark (tylko HashTableList)\n";
     std::cout << "6. Uruchom benchmark (tylko CuckooHashTable)\n";
-    std::cout << "7. Wyjdz\n";
+    std::cout << "7. Uruchom benchmark (tylko AVLHashTable)\n";
+    std::cout << "8. Wyjdz\n";
     std::cout << "Wybor: ";
   }
 
@@ -84,6 +86,7 @@ public:
   void run_benchmarks_all() {
     run_hash_table_list();
     run_cuckoo();
+    run_avl();
   }
 
   void run_hash_table_list() {
@@ -98,6 +101,13 @@ public:
     benchmark bench(_dataset_name);
     bench.run_structure_tests<CuckooHashTable>(
         "CuckooHashTable", []() { return new CuckooHashTable(); });
+  }
+
+  void run_avl() {
+    std::cout << "\nUruchamianie benchmarku: AVLHashTable...\n";
+    benchmark bench(_dataset_name);
+    bench.run_structure_tests<AVLHashTable<int>>(
+        "AVLHashTable", []() { return new AVLHashTable<int>(); });
   }
 
   void run() {
@@ -127,6 +137,9 @@ public:
         run_cuckoo();
         break;
       case 7:
+        run_avl();
+        break;
+      case 8:
         std::cout << "Koniec.\n";
         return;
       default:

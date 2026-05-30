@@ -23,9 +23,6 @@ SłownikTablicaMieszajaca/
 │   ├── LinkedList.hpp              # Klasa listy wiązanej (nagłówek)
 │   ├── LinkedList.cpp              # Klasa listy wiązanej (implementacja)
 │   │
-│   ├── AVLTree.hpp                 # Klasa zbalansowanego drzewa AVL (nagłówek)
-│   ├── AVLTree.cpp                 # Klasa zbalansowanego drzewa AVL (implementacja)
-│   │
 │   ├── HashTableList.hpp           # Tablica mieszająca + lista (nagłówek)
 │   ├── HashTableList.cpp           # Tablica mieszająca + lista (implementacja)
 │   │
