@@ -1,11 +1,16 @@
 #pragma once
 
-#include "IList.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
+#include <random>
+
+#include "IDictionary.hpp"
+
+// ─── data_set ─────────────────────────────────────────────────────────────────
 
 class data_set {
 public:
@@ -15,42 +20,18 @@ public:
   std::vector<int> get_points() const;
   std::vector<std::string> get_test_files() const;
 
-  std::vector<int> get_data(const std::string &test_file,
-                            int num_elements) const;
-
   // Parsuje seed z nazwy pliku (np. "3748291234.txt" → 3748291234)
   unsigned int get_file_seed(const std::string &test_file) const;
 
-  template <typename T>
-  void load_to_list(const std::string &test_file, int num_elements,
-                    IList<T> &list) const {
-#ifndef PROJECT_ROOT_DIR
-#define PROJECT_ROOT_DIR "."
-#endif
-    std::filesystem::path file_path =
-        std::filesystem::path(PROJECT_ROOT_DIR) / "data" / name_ / test_file;
-    std::ifstream file(file_path);
+  // Wczytuje pierwsze num_elements par (klucz, wartość) do słownika dict.
+  // Format wiersza w pliku: "klucz,wartość"
+  void load_to_dict(const std::string &test_file, int num_elements,
+                    IDictionary &dict) const;
 
-    if (!file) {
-      std::cerr << "Failed to open " << file_path << "\n";
-      return;
-    }
-
-    list.clear();
-
-    T val;
-    int count = 0;
-    while (count < num_elements && file >> val) {
-      list.push_back(val);
-      count++;
-    }
-
-    if (count < num_elements) {
-      std::cerr << "Warning: " << file_path
-                << " does not contain enough data (requested " << num_elements
-                << ", found " << count << ").\n";
-    }
-  }
+  // Wczytuje pierwsze num_elements par jako wektor – do użytku przez benchmark
+  // przy wyborze klucza do remove().
+  std::vector<std::pair<int,int>> load_pairs(const std::string &test_file,
+                                             int num_elements) const;
 
 private:
   std::string name_;
@@ -58,8 +39,12 @@ private:
   std::vector<std::string> test_files_;
 };
 
+// ─── data_handler ─────────────────────────────────────────────────────────────
+
 class data_handler {
 public:
+  // Generuje dataset: num_files plików, każdy z max(points) par (key,value).
+  // Format wiersza: "klucz,wartość"
   static void generate_dataset(const std::string &dataset_name,
                                const std::vector<int> &points, int num_files,
                                unsigned int main_seed);

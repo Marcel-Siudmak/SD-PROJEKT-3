@@ -1,193 +1,230 @@
 #pragma once
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <map>
 #include <random>
 #include <string>
 #include <vector>
 
-#include "IList.hpp"
 #include "data_handler.hpp"
 
 using BenchmarkResults = std::map<std::string, std::map<int, double>>;
 
+// ============================================================
+//  Liczba kopii słownika tworzonych dla każdego seeda.
+//  Większa wartość → dokładniejszy pomiar dla krótkich operacji.
+// ============================================================
+static constexpr int NUM_COPIES = 10;
+
+// Zakres kluczy używanych przy generowaniu danych
+static constexpr int KEY_MIN = 1;
+static constexpr int KEY_MAX = 2'000'000;
+
+// ─── result_exporter
+// ──────────────────────────────────────────────────────────
+//
+// Zapis przyrostowy: jeden wiersz CSV natychmiast po zmierzeniu punktu.
+// Format: operacja;n;czas_ns
+//
 class result_exporter {
 public:
+  static std::ofstream open_csv(const std::string &dataset_name,
+                                const std::string &structure_name);
+
+  static void append_row(std::ofstream &file, const std::string &operation,
+                         int n, double time_ns);
+
+  // Zachowana dla zgodności wstecznej
   static void export_to_csv(const BenchmarkResults &results,
                             const std::string &dataset_name,
                             const std::string &structure_name);
 };
 
+// ─── benchmark
+// ────────────────────────────────────────────────────────────────
+
 class benchmark {
 public:
   explicit benchmark(const std::string &dataset_name);
 
-  template <typename ListType>
+  // ============================================================
+  //  Główna metoda uruchamiająca testy dla jednej struktury.
+  //
+  //  DictType     – konkretny typ słownika (np. HashTableList)
+  //  dict_factory – lambda () → DictType* tworząca pustą instancję
+  //
+  //  Mierzone operacje:
+  //    insert(key, value) – wstawia losową, nową parę
+  //    remove(key)        – usuwa losowo wybrany istniejący klucz
+  //
+  //  Procedura pomiaru (taka sama jak w poprzednim projekcie):
+  //    Dla każdego seeda:
+  //      1. Utwórz NUM_COPIES identycznych kopii słownika z n par.
+  //      2. Uruchom zegarek.
+  //      3. Wykonaj operację na każdej kopii.
+  //      4. Zatrzymaj zegarek.
+  //      5. Wynik dla seeda = czas_łączny / NUM_COPIES.
+  //    Wynik końcowy = średnia ze wszystkich seedów.
+  // ============================================================
+  template <typename DictType>
   void run_structure_tests(const std::string &structure_name,
-                           std::function<ListType *()> list_factory) {
-    BenchmarkResults results;
+                           std::function<DictType *()> dict_factory) {
+
+    std::ofstream csv =
+        result_exporter::open_csv(dataset_.get_name(), structure_name);
 
     for (int n : dataset_.get_points()) {
       std::cout << "\n--- Testing " << structure_name << " for N=" << n
                 << " ---\n";
 
       const auto &test_files = dataset_.get_test_files();
-      size_t num_instances = test_files.size();
+      const size_t num_seeds = test_files.size();
 
-      // ---------------------------------------------------------------
-      // Buduj instancje i zapamiętaj seed każdego pliku
-      // ---------------------------------------------------------------
-      std::vector<IList<int> *> instances(num_instances);
-      std::vector<unsigned int> file_seeds(num_instances);
+      std::vector<double> insert_times(num_seeds);
+      std::vector<double> remove_times(num_seeds);
 
-      for (size_t i = 0; i < num_instances; ++i) {
-        instances[i] = list_factory();
-        dataset_.load_to_list(test_files[i], n, *instances[i]);
-        file_seeds[i] = dataset_.get_file_seed(test_files[i]);
-      }
+      for (size_t s = 0; s < num_seeds; ++s) {
+        const std::string &file = test_files[s];
+        const unsigned int seed = dataset_.get_file_seed(file);
 
-      // ---------------------------------------------------------------
-      // 1. push_front
-      // ---------------------------------------------------------------
-      results["push_front"][n] = measure_operation(
-          instances, [](IList<int> *list) { list->push_front(999); });
+        // --------------------------------------------------------
+        // Wczytaj pary z pliku – potrzebne do:
+        //   • załadowania kopii słownika
+        //   • wylosowania klucza do remove()
+        // --------------------------------------------------------
+        auto pairs = dataset_.load_pairs(file, n); // vector<pair<int,int>>
 
-      // ---------------------------------------------------------------
-      // 2. push_back
-      // ---------------------------------------------------------------
-      results["push_back"][n] = measure_operation(
-          instances, [](IList<int> *list) { list->push_back(999); });
+        // --------------------------------------------------------
+        // 1. insert()
+        //
+        //    Każda kopia słownika zawiera n par z pliku.
+        //    Wstawiamy jeden dodatkowy element o kluczu wylosowanym
+        //    deterministycznie z zakresu [KEY_MIN, KEY_MAX].
+        //    Klucz jest inny dla każdej kopii, ale powtarzalny
+        //    (RNG seed = file_seed).
+        // --------------------------------------------------------
+        {
+          std::mt19937 rng(seed);
+          std::uniform_int_distribution<int> key_dist(KEY_MIN, KEY_MAX);
 
-      // ---------------------------------------------------------------
-      // 3. pop_front
-      // ---------------------------------------------------------------
-      results["pop_front"][n] = measure_operation(
-          instances, [](IList<int> *list) { list->pop_front(); });
+          // Wylosuj NUM_COPIES kluczy do wstawienia (poza pomiarem)
+          std::vector<int> ins_keys(NUM_COPIES);
+          for (int &k : ins_keys)
+            k = key_dist(rng);
 
-      // ---------------------------------------------------------------
-      // 4. pop_back
-      // ---------------------------------------------------------------
-      results["pop_back"][n] = measure_operation(
-          instances, [](IList<int> *list) { list->pop_back(); });
+          constexpr int INSERT_VALUE = 42;
 
-      // ---------------------------------------------------------------
-      // 5. insert na losowym indeksie
-      //    Używamy tego samego file_seed co dane — pełna odtwarzalność.
-      //    Po pop_front/pop_back lista ma n-1 elementów, więc
-      //    przeładowujemy świeże instancje przed każdą nową operacją.
-      // ---------------------------------------------------------------
+          auto copies = make_copies<DictType>(dict_factory, pairs, NUM_COPIES);
 
-      // Przeładuj instancje (pop_front/pop_back zmodyfikowały listy)
-      for (size_t i = 0; i < num_instances; ++i) {
-        dataset_.load_to_list(test_files[i], n, *instances[i]);
-      }
+          auto t0 = std::chrono::high_resolution_clock::now();
+          for (size_t c = 0; c < copies.size(); ++c)
+            copies[c]->insert(ins_keys[c], INSERT_VALUE);
+          auto t1 = std::chrono::high_resolution_clock::now();
 
-      results["insert_random"][n] = measure_operation_with_seeds(
-          instances, file_seeds, n,
-          [](IList<int> *list, int idx, int /*n*/) {
-            list->insert(999, idx);
-          },
-          /* index_range_is_n_plus_one = */ true); // indeks ∈ [0, n]
+          insert_times[s] = ns(t0, t1) / NUM_COPIES;
+          free_copies(copies);
+        }
 
-      // ---------------------------------------------------------------
-      // 6. remove na losowym indeksie
-      // ---------------------------------------------------------------
-      for (size_t i = 0; i < num_instances; ++i) {
-        dataset_.load_to_list(test_files[i], n, *instances[i]);
-      }
+        // --------------------------------------------------------
+        // 2. remove()
+        //
+        //    Każda kopia słownika zawiera n par z pliku.
+        //    Usuwamy jeden istniejący klucz wylosowany deterministycznie
+        //    ze zbioru kluczy załadowanych do słownika.
+        //    RNG seed = file_seed ^ 0xDEADBEEFu (inny strumień niż insert).
+        // --------------------------------------------------------
+        {
+          if (pairs.empty()) {
+            remove_times[s] = 0.0;
+          } else {
+            std::mt19937 rng(seed ^ 0xDEADBEEFu);
+            std::uniform_int_distribution<int> idx_dist(
+                0, static_cast<int>(pairs.size()) - 1);
 
-      results["remove_random"][n] = measure_operation_with_seeds(
-          instances, file_seeds, n,
-          [](IList<int> *list, int idx, int /*n*/) {
-            list->remove(idx);
-          },
-          /* index_range_is_n_plus_one = */ false); // indeks ∈ [0, n-1]
+            // Wylosuj NUM_COPIES indeksów kluczy do usunięcia (poza pomiarem)
+            std::vector<int> rem_keys(NUM_COPIES);
+            for (int &k : rem_keys)
+              k = pairs[idx_dist(rng)].first;
 
-      // ---------------------------------------------------------------
-      // 7. find — szukamy wartości 1'000'000 wstawionej deterministycznie.
-      //
-      //    Przygotowanie per-instancja (NIE mierzymy tego czasu):
-      //      a) wylosuj find_idx ∈ [0, n-1] z file_seed
-      //      b) usuń element na find_idx
-      //      c) wstaw 1'000'000 na find_idx
-      //    Ponieważ dane są z [1, 999'999], wartość 1'000'000 jest unikalna.
-      // ---------------------------------------------------------------
-      for (size_t i = 0; i < num_instances; ++i) {
-        dataset_.load_to_list(test_files[i], n, *instances[i]);
+            auto copies =
+                make_copies<DictType>(dict_factory, pairs, NUM_COPIES);
 
-        // Wstaw unikalną wartość na losowy indeks (poza pomiarem)
-        std::mt19937 rng(file_seeds[i]);
-        std::uniform_int_distribution<int> idx_dist(0, n - 1);
-        int find_idx = idx_dist(rng);
-        instances[i]->remove(find_idx);
-        instances[i]->insert(1'000'000, find_idx);
-      }
+            auto t0 = std::chrono::high_resolution_clock::now();
+            for (size_t c = 0; c < copies.size(); ++c)
+              copies[c]->remove(rem_keys[c]);
+            auto t1 = std::chrono::high_resolution_clock::now();
 
-      results["find"][n] = measure_operation(
-          instances, [](IList<int> *list) { list->find(1'000'000); });
+            remove_times[s] = ns(t0, t1) / NUM_COPIES;
+            free_copies(copies);
+          }
+        }
 
-      // ---------------------------------------------------------------
-      // Zwolnij pamięć
-      // ---------------------------------------------------------------
-      for (auto ptr : instances) {
-        delete ptr;
-      }
-    }
+      } // koniec pętli po seedach
 
-    result_exporter::export_to_csv(results, dataset_.get_name(),
-                                   structure_name);
+      // --------------------------------------------------------
+      // Uśrednij i zapisz do CSV
+      // --------------------------------------------------------
+      double avg_insert = average(insert_times);
+      double avg_remove = average(remove_times);
+
+      result_exporter::append_row(csv, "insert", n, avg_insert);
+      result_exporter::append_row(csv, "remove", n, avg_remove);
+      csv.flush();
+
+      std::cout << "  insert avg = " << avg_insert << " ns\n";
+      std::cout << "  remove avg = " << avg_remove << " ns\n";
+
+    } // koniec pętli po punktach pomiarowych
+
+    csv.close();
+    std::cout << "\nWyniki zapisane do results/" << dataset_.get_name() << "/"
+              << structure_name << ".csv\n";
   }
 
 private:
   data_set dataset_;
 
-  // Podstawowy pomiar — ta sama operacja dla wszystkich instancji
-  double measure_operation(const std::vector<IList<int> *> &instances,
-                           const std::function<void(IList<int> *)> &operation) {
-    long long total_nanoseconds = 0;
-
-    for (auto list_instance : instances) {
-      auto start = std::chrono::high_resolution_clock::now();
-      operation(list_instance);
-      auto end = std::chrono::high_resolution_clock::now();
-      total_nanoseconds +=
-          std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-              .count();
+  // ----------------------------------------------------------
+  //  Tworzy `count` identycznych kopii słownika załadowanych
+  //  z wektora par (klucz, wartość).
+  // ----------------------------------------------------------
+  template <typename DictType>
+  std::vector<IDictionary *>
+  make_copies(std::function<DictType *()> factory,
+              const std::vector<std::pair<int, int>> &pairs, int count) {
+    std::vector<IDictionary *> copies(count);
+    for (int i = 0; i < count; ++i) {
+      copies[i] = factory();
+      copies[i]->clear();
+      for (const auto &[k, v] : pairs)
+        copies[i]->insert(k, v);
     }
-
-    if (instances.empty())
-      return 0.0;
-    return static_cast<double>(total_nanoseconds) / instances.size();
+    return copies;
   }
 
-  // Pomiar z losowym indeksem wyznaczonym z file_seed.
-  // use_n_plus_one=true  → indeks ∈ [0, n]   (insert)
-  // use_n_plus_one=false → indeks ∈ [0, n-1] (remove)
-  double measure_operation_with_seeds(
-      const std::vector<IList<int> *> &instances,
-      const std::vector<unsigned int> &file_seeds, int n,
-      const std::function<void(IList<int> *, int, int)> &operation,
-      bool use_n_plus_one) {
-    long long total_nanoseconds = 0;
+  static void free_copies(std::vector<IDictionary *> &copies) {
+    for (auto *ptr : copies)
+      delete ptr;
+    copies.clear();
+  }
 
-    for (size_t i = 0; i < instances.size(); ++i) {
-      std::mt19937 rng(file_seeds[i]);
-      int upper = use_n_plus_one ? n : (n - 1);
-      std::uniform_int_distribution<int> idx_dist(0, upper);
-      int idx = idx_dist(rng);
-
-      auto start = std::chrono::high_resolution_clock::now();
-      operation(instances[i], idx, n);
-      auto end = std::chrono::high_resolution_clock::now();
-      total_nanoseconds +=
-          std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-              .count();
-    }
-
-    if (instances.empty())
+  static double average(const std::vector<double> &v) {
+    if (v.empty())
       return 0.0;
-    return static_cast<double>(total_nanoseconds) / instances.size();
+    double sum = 0.0;
+    for (double x : v)
+      sum += x;
+    return sum / static_cast<double>(v.size());
+  }
+
+  static double ns(std::chrono::high_resolution_clock::time_point t0,
+                   std::chrono::high_resolution_clock::time_point t1) {
+    return static_cast<double>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
   }
 };
